@@ -21,4 +21,3 @@ __pycache__/
 Thumbs.db
 
 # Ignore generated plots during development, so final plots can be force-added if needed
-docs/performance-plots/
