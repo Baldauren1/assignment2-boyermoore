@@ -1,0 +1,1 @@
+Student A: Boyer-Moore Majority Vote (single-pass majority element detection)
