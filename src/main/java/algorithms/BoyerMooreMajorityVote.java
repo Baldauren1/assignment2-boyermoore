@@ -3,55 +3,73 @@ package algorithms;
 import metrics.PerformanceTracker;
 
 /**
- * Boyer-Moore Majority Vote Algorithm
- * Finds an element that appears > n/2 times (if exists).
- * Returns Integer (candidate) or null if none.
+ * Boyer-Moore majority vote with batched metric updates and optional verification.
+ * Constructor: new BoyerMooreMajorityVote(new PerformanceTracker()).
  */
 public class BoyerMooreMajorityVote {
-
     private final PerformanceTracker tracker;
+    private final boolean verify;
 
     public BoyerMooreMajorityVote(PerformanceTracker tracker) {
-        this.tracker = tracker;
+        this(tracker, true);
     }
 
+    public BoyerMooreMajorityVote(PerformanceTracker tracker, boolean verify) {
+        if (tracker == null) throw new IllegalArgumentException("tracker must not be null");
+        this.tracker = tracker;
+        this.verify = verify;
+    }
+
+    /**
+     * Returns majority element (Integer) if exists; otherwise returns null.
+     * Throws IllegalArgumentException for null or empty array (matches tests).
+     */
     public Integer findMajority(int[] arr) {
-        if (arr == null || arr.length == 0) {
-            throw new IllegalArgumentException("Array must not be null or empty.");
-        }
+        if (arr == null || arr.length == 0) throw new IllegalArgumentException("array must be non-empty");
 
-        // Phase 1: find candidate
-        int candidate = arr[0];
-        int count = 1;
-        tracker.incrementArrayAccesses(1); // initial read
+        // local counters to avoid hot-path Tracker calls
+        long localComparisons = 0;
+        long localUpdates = 0;
 
-        for (int i = 1; i < arr.length; i++) {
-            tracker.incrementArrayAccesses(1);
-            tracker.incrementComparisons();
-            if (arr[i] == candidate) {
+        int candidate = 0;
+        int count = 0;
+
+        for (int v : arr) {
+            // we account 1 comparison per element for simplicity
+            localComparisons++;
+            if (count == 0) {
+                candidate = v;
+                count = 1;
+                localUpdates++; // candidate assignment/initialization
+            } else if (v == candidate) {
                 count++;
-                tracker.incrementUpdates();
+                localUpdates++;
             } else {
                 count--;
-                tracker.incrementUpdates();
-                if (count == 0) {
-                    candidate = arr[i];
-                    count = 1;
-                    tracker.incrementUpdates();
-                }
             }
         }
 
-        // Phase 2: verify
-        int freq = 0;
-        for (int x : arr) {
-            tracker.incrementArrayAccesses(1);
-            tracker.incrementComparisons();
-            if (x == candidate) freq++;
+        // flush local counters to global tracker once
+        tracker.addComparisons(localComparisons);
+        tracker.addUpdates(localUpdates);
+
+        if (!verify) {
+            return candidate;
         }
 
-        if (freq > arr.length / 2) return candidate;
-        else return null;
+        // verification pass (counts array accesses)
+        long localArrayAccesses = 0;
+        long occ = 0;
+        for (int v : arr) {
+            localArrayAccesses++;
+            if (v == candidate) occ++;
+        }
+        tracker.addArrayAccesses(localArrayAccesses);
+
+        if (occ > arr.length / 2) {
+            return candidate;
+        } else {
+            return null;
+        }
     }
 }
-
